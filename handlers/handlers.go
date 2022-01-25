@@ -33,10 +33,12 @@ type WsResponse struct {
 	Action      string `json:"action"`
 	Message     string `json:"message"`
 	MessageType string `json:"messageType"`
+	ConnectedUsers []string `json:"connectedUsers"`
 }
 
 type WsPayload struct {
 	Action  string              `json:"action"`
+	Username string `json:"username"`
 	Message string              `json:"message"`
 	Conn    WebSocketConnection `json:"-"`
 }
@@ -90,9 +92,21 @@ func ListenToWsChannel() {
 	for {
 		evt := <-wsChannel
 
-		response.Action = "Made it to Listen to ws channel"
-		response.Message = fmt.Sprintf("Some message, and action was %s", evt.Action)
-		broadcastToAll(response)
+		switch evt.Action {
+		case "username":
+			// get a list of all users and send it back via broadcast
+			clients[evt.Conn] = evt.Username
+			users := getUserList()
+			response.Action = "listUsers"
+			response.ConnectedUsers = users
+			broadcastToAll(response)
+		case "left":
+			response.Action = "listUsers"
+			delete(clients, evt.Conn)
+			users := getUserList()
+			response.ConnectedUsers = users
+			broadcastToAll(response)
+		}
 	}
 }
 
@@ -105,6 +119,17 @@ func broadcastToAll(response WsResponse) {
 			delete(clients, client)
 		}
 	}
+}
+
+func getUserList() []string {
+	var userList []string
+	for _, u := range clients {
+		if u != "" {
+			userList = append(userList, u)
+		}
+	}
+	// sort.Strings(userList)
+	return userList
 }
 
 // Renders the Home page
