@@ -30,17 +30,17 @@ type WebSocketConnection struct {
 
 // defines the response sent back from websocket
 type WsResponse struct {
-	Action      string `json:"action"`
-	Message     string `json:"message"`
-	MessageType string `json:"messageType"`
+	Action         string   `json:"action"`
+	Message        string   `json:"message"`
+	MessageType    string   `json:"messageType"`
 	ConnectedUsers []string `json:"connectedUsers"`
 }
 
 type WsPayload struct {
-	Action  string              `json:"action"`
-	Username string `json:"username"`
-	Message string              `json:"message"`
-	Conn    WebSocketConnection `json:"-"`
+	Action   string              `json:"action"`
+	Username string              `json:"username"`
+	Message  string              `json:"message"`
+	Conn     WebSocketConnection `json:"-"`
 }
 
 // Upgrades connection to websocket
@@ -105,6 +105,10 @@ func ListenToWsChannel() {
 			delete(clients, evt.Conn)
 			users := getUserList()
 			response.ConnectedUsers = users
+			broadcastToAll(response)
+		case "broadcast":
+			response.Action = "broadcast"
+			response.Message = fmt.Sprintf("<strong>%s</strong>: %s", evt.Username, evt.Message)
 			broadcastToAll(response)
 		}
 	}

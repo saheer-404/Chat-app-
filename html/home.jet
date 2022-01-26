@@ -24,7 +24,7 @@
       </div>
     </div>
     <hr />
-    <div class="row">
+    <form id="chat-form" class="row">
       <div class="col-md-8">
         <h3>Chat</h3>
         <div class="form-group">
@@ -40,10 +40,12 @@
         <div class="form-group">
           <label for="message">Message:</label>
           <input type="text" name="message" id="message" class="form-control" autocomplete="off">
+          <button type="submit" id="send-button" class="btn btn-primary mt-2">Send Message</button>
         </div>
         <input type="hidden" name="action" id="action">
         <hr />
-        <div id="output" class="chatbox">
+        <div id="status" class="mt-2 me-2 float-end">test</div>
+        <div id="chatbox" class="chatbox">
         </div>
       </div>
       <div class="col-md-4">
@@ -51,10 +53,19 @@
         <ul id="userList">
         </ul>
       </div>
-    </div>
+    </form>
   </div>
+  <script src="/static/reconnecting-websocket.min.js"></script>
   <script>
     let socket = null;
+    const form = document.getElementById("chat-form");
+    const userInput = document.getElementById("username");
+    const messageInput = document.getElementById("message");
+    const sendButton = document.getElementById("send-button")
+    const chatbox = document.getElementById("chatbox");
+    const status = document.getElementById("status");
+    const offlineBadge = `<span class="badge bg-danger opacity-75">Not connected</span>`;
+      const onlineBadge = `<span class="badge bg-success opacity-75">Connected</span>`;
 
     window.onbeforeunload = function() {
       console.log("leaving")
@@ -64,23 +75,25 @@
     }
 
     document.addEventListener("DOMContentLoaded", function(){
-      socket = new WebSocket("ws://127.0.0.1:8080/ws");
+      socket = new ReconnectingWebSocket("ws://127.0.0.1:8080/ws", null, { debug: true, reconnectInterval: 1500 });
 
       socket.onopen = () => {
         console.log("Successfully connected")
+        status.innerHTML = onlineBadge;
       }
 
       socket.onclose = () => {
         console.log("connection closed")
+        status.innerHTML = offlineBadge;
       }
 
       socket.onerror = err => {
-        console.log(new Error(err).message)
+        console.log(new Error(err));
+        status.innerHTML = offlineBadge;
       }
 
       socket.onmessage = msg => {
         let data = JSON.parse(msg.data)
-        console.log(data)
         switch (data.action) {
           case "listUsers":
             const ul = document.getElementById("userList");
@@ -96,17 +109,58 @@
               });
             }
             break;
+          case "broadcast":
+            chatbox.innerHTML = chatbox.innerHTML + data.message + "<br />";
+            break;
         }
       }
 
-      const userInput = document.getElementById("username")
+      form.addEventListener("submit", function(event) {
+        event.preventDefault();
+      });
+
       userInput.addEventListener("change", function() {
         const jsonData = {};
         jsonData.action = "username";
         jsonData.username = this.value;
         socket.send(JSON.stringify(jsonData));
-      })
+      });
+      
+      messageInput.addEventListener("keydown", function(event) {
+        if (event.code === "Enter") {
+          if (!socket) {
+            console.log("no connection")
+            return false;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          sendMessage();
+        }
+      });
+
+      sendButton.addEventListener("click", function() {
+        sendMessage();
+      });
     })
+
+    function sendMessage() {
+      if (!checkUserAndMessage()) return false;
+
+      const jsonData = {};
+      jsonData.action = "broadcast";
+      jsonData.username = document.getElementById("username").value;
+      jsonData.message = document.getElementById("message").value;
+      socket.send(JSON.stringify(jsonData))
+      document.getElementById("message").value = "";
+    }
+
+    function checkUserAndMessage() {
+      if ((userInput.value === "") || (messageInput.value === "")) {
+        alert("Add a name and enter a message.")
+        return false;
+      }
+      return true;
+    }
   </script>
 </body>
 </html>
